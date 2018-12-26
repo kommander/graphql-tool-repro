@@ -3,81 +3,41 @@ const { ApolloServer, gql } = require('apollo-server-express');
 const express = require('express');
 const app = express();
 
-const books = [{ id: 1, title: 'One Book' }];
-const authors = [{ id: 1, name: 'One Author', books: [1] }]
-
 const typeDefs1 = gql`
+  enum AllowedColor {
+    RED
+    GREEN
+    BLUE
+  }
+
   type Query {
-    book: Book
-  }
-
-  type Book {
-    id: Int!,
-    title: String
+    favoriteColor: AllowedColor # As a return value
+    avatar(borderColor: AllowedColor): String # As an argument
   }
 `;
 
-const typeDefs2 = gql`
-  type Query {
-    author: Author
-  }
-
-  type Author {
-    id: Int!,
-    name: String
-  }
-`;
-
-const typeDefsExtend = gql`
-  extend type Author {
-    books: [Book]
-  }
-
-  extend type Book {
-    author: Author
-  }
-`;
-
-const bookResolvers = {
+const resolvers1 = {
+  // AllowedColor: {
+  //   RED: '#f00',
+  //   GREEN: '#0f0',
+  //   BLUE: '#00f'
+  // },
   Query: {
-    book: () => books.find(book => (book.id === 1))
+    favoriteColor: () => 'RED',
+    avatar: (parent, args) => {
+      return `${JSON.stringify(args)}`
+    }
   }
 }
 
-const authorResolvers = {
-  Query: {
-    author: () => authors.find(author => (author.id === 1))
-  }
-}
 
-const extendResolvers = {
-  Book: {
-    author: (book) => {
-      console.log('resolving book.author for', book)
-      return authors.find(author => author.books.includes(book.id))
-    } 
-  },
-  Author: {
-    books: (author) => {
-      console.log('resolving author.books for', author)
-      return books.filter(book => author.books.includes(book.id))
-    } 
-  }
-}
-
-const bookSchema = makeExecutableSchema({
+const schema1 = makeExecutableSchema({
   typeDefs: typeDefs1,
-  resolvers: bookResolvers
-});
-
-const authorSchema = makeExecutableSchema({
-  typeDefs: typeDefs2,
-  resolvers: authorResolvers
+  resolvers: resolvers1
 });
 
 const merged = mergeSchemas({
-  schemas: [bookSchema, authorSchema, typeDefsExtend],
-  resolvers: [extendResolvers]
+  schemas: [schema1]
 });
 
 const server = new ApolloServer({
