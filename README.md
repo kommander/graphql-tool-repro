@@ -7,15 +7,15 @@
 
 ## This does not work
 ```gql
-{
-  favoriteColor
-  avatar(borderColor:RED)
+subscription {
+  prefix_counterIncrement {
+    value
+  }
 }
 ```
 
 ## Possible Cause
-- https://github.com/apollographql/graphql-tools/blob/master/src/stitching/mergeSchemas.ts#L446
-- https://github.com/apollographql/graphql-tools/blob/master/src/stitching/schemaRecreation.ts#L207
+- https://github.com/apollographql/graphql-tools/blob/master/src/transforms/transformSchema.ts#L15-L28
 
 ## Possible Solution
-- **Ugly:** Do not use ENUM resolvers when merging with `mergeSchemas` :scream:
+- **Ugly:** Do not use the RenameRootField transform for subscriptions :scream:

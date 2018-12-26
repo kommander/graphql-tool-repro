@@ -1,50 +1,65 @@
-const { makeExecutableSchema, mergeSchemas } = require('graphql-tools');
+const { makeExecutableSchema, RenameRootFields, transformSchema } = require('graphql-tools');
 const { ApolloServer, gql } = require('apollo-server-express');
 const express = require('express');
+const { createServer } = require('http');
 const app = express();
+const server = createServer(app);
+const { PubSub } = require('apollo-server');
 
-const typeDefs1 = gql`
-  enum AllowedColor {
-    RED
-    GREEN
-    BLUE
+const pubsub = new PubSub();
+
+const COUNTER_INCREMENT_TOPIC = 'counter_increment';
+let counter = 0;
+
+setInterval(() => {
+    pubsub.publish(COUNTER_INCREMENT_TOPIC, { prefix_counterIncrement: { value: counter += 1 } });
+}, 1000);
+
+const resolvers = {
+  Subscription: {
+    counterIncrement: {
+      subscribe: () => {
+        console.log('SUBSCRIBED')
+        return pubsub.asyncIterator(COUNTER_INCREMENT_TOPIC)
+      },
+    },
+  },
+  Query: {
+    currentCount: () => ({ value: counter }),
+  },
+};
+
+const typeDefs = gql`
+  type CounterValue {
+    value: Int!
+  }
+
+  type Subscription {
+    counterIncrement: CounterValue
   }
 
   type Query {
-    favoriteColor: AllowedColor # As a return value
-    avatar(borderColor: AllowedColor): String # As an argument
+      currentCount: CounterValue
   }
 `;
 
-const resolvers1 = {
-  // AllowedColor: {
-  //   RED: '#f00',
-  //   GREEN: '#0f0',
-  //   BLUE: '#00f'
-  // },
-  Query: {
-    favoriteColor: () => 'RED',
-    avatar: (parent, args) => {
-      return `${JSON.stringify(args)}`
-    }
+const schema = transformSchema(
+  makeExecutableSchema({ typeDefs, resolvers }),
+  [
+    new RenameRootFields((_operation, name) => `prefix_${name}`),
+    // new RenameRootFields((_operation, name) => name), // will work
+  ],
+);
+
+const apollo = new ApolloServer({
+  schema,
+  subscriptions: {
+    path: '/ws/subscriptions'
   }
-}
-
-
-const schema1 = makeExecutableSchema({
-  typeDefs: typeDefs1,
-  resolvers: resolvers1
-});
-
-const merged = mergeSchemas({
-  schemas: [schema1]
-});
-
-const server = new ApolloServer({
-  schema: merged,
 })
 
-server.applyMiddleware({ app, path: '/api/graphql' })
+apollo.applyMiddleware({ app, path: '/api/graphql' })
+apollo.installSubscriptionHandlers(server)
 
-app.listen(8484)
+server.listen(8484)
 
