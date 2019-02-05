@@ -45,3 +45,16 @@ When using `mergeSchemas` with schemas created by `makeExecutableSchema`, resolv
   }
 }
 ```
+
+### Partial Result
+When specifying any other field in the query for `book`, we get a book, but the `Author` resolver still is not called at all.
+```gql
+{
+  book {
+    id # << Note the extra field
+    author {
+      name
+    }
+  }
+}
+```
