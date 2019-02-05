@@ -1,10 +1,6 @@
 const { makeExecutableSchema, mergeSchemas } = require('graphql-tools');
 const { ApolloServer, gql } = require('apollo-server-express');
 const express = require('express');
-const app = express();
-
-const books = [{ id: 1, title: 'One Book' }];
-const authors = [{ id: 1, name: 'One Author', books: [1] }]
 
 const typeDefs1 = gql`
   type Query {
@@ -12,7 +8,7 @@ const typeDefs1 = gql`
   }
 
   type Book {
-    id: Int!,
+    id: Int,
     title: String
   }
 `;
@@ -21,18 +17,13 @@ const typeDefs2 = gql`
   type Query {
     author: Author
   }
-
   type Author {
-    id: Int!,
+    id: Int,
     name: String
   }
 `;
 
 const typeDefsExtend = gql`
-  extend type Author {
-    books: [Book]
-  }
-
   extend type Book {
     author: Author
   }
@@ -40,31 +31,48 @@ const typeDefsExtend = gql`
 
 const bookResolvers = {
   Query: {
-    book: () => books.find(book => (book.id === 1))
+    book: () => console.log('BOOOKKK') || ({ id: 1, title: 'One Book' })
   }
 }
 
 const authorResolvers = {
   Query: {
-    author: () => authors.find(author => (author.id === 1))
+    author: () => console.log('AUTHOR') || ({ id: 1, name: 'Not the one' })
+  },
+  Author: {
+    name: () => 'Always the same'
   }
 }
 
 const extendResolvers = {
   Book: {
-    author: (book) => {
-      console.log('resolving book.author for', book)
-      return authors.find(author => author.books.includes(book.id))
-    } 
+    author: () => ({})
   },
-  Author: {
-    books: (author) => {
-      console.log('resolving author.books for', author)
-      return books.filter(book => author.books.includes(book.id))
-    } 
-  }
 }
 
+// THIS WORKS
+const base = makeExecutableSchema({
+  typeDefs: gql`
+    type Own {
+      one: Int,
+      two: String
+    }
+  `,
+  resolvers: {}
+});
+const mergedWorking = mergeSchemas({
+  schemas: [base, typeDefs1, typeDefs2, typeDefsExtend],
+  resolvers: [bookResolvers, authorResolvers, extendResolvers]
+});
+
+const server1 = new ApolloServer({
+  schema: mergedWorking,
+})
+const app1 = express();
+server1.applyMiddleware({ app: app1, path: '/api/graphql' })
+app1.listen(8585)
+
+// THIS DOESNT
 const bookSchema = makeExecutableSchema({
   typeDefs: typeDefs1,
   resolvers: bookResolvers
@@ -75,16 +83,17 @@ const authorSchema = makeExecutableSchema({
   resolvers: authorResolvers
 });
 
-const merged = mergeSchemas({
+const mergedBroken = mergeSchemas({
   schemas: [bookSchema, authorSchema, typeDefsExtend],
   resolvers: [extendResolvers]
+  // Works when overwriting resolvers again
+  // resolvers: [bookResolvers, authorResolvers, extendResolvers]
 });
 
-const server = new ApolloServer({
-  schema: merged,
+const server2 = new ApolloServer({
+  schema: mergedBroken,
 })
-
-server.applyMiddleware({ app, path: '/api/graphql' })
-
-app.listen(8484)
+const app2 = express();
+server2.applyMiddleware({ app: app2, path: '/api/graphql' })
+app2.listen(8686)
 
