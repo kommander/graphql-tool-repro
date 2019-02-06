@@ -46,7 +46,10 @@ const authorResolvers = {
 
 const extendResolvers = {
   Book: {
-    author: () => ({})
+    author: {
+      fragment: '... on Book { id }',
+      resolve: () => ({})
+    },
   },
 }
 
