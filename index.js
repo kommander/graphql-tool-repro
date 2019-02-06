@@ -3,16 +3,13 @@ const { ApolloServer, gql } = require('apollo-server-express');
 const express = require('express');
 const app = express();
 
-const books = [{ id: 1, title: 'One Book' }];
-const authors = [{ id: 1, name: 'One Author', books: [1] }]
-
 const typeDefs1 = gql`
   type Query {
     book: Book
   }
 
   type Book {
-    id: Int!,
+    id: Int!
     title: String
   }
 `;
@@ -23,8 +20,9 @@ const typeDefs2 = gql`
   }
 
   type Author {
-    id: Int!,
+    id: Int!
     name: String
+    bookIds: [Int!]
   }
 `;
 
@@ -40,30 +38,73 @@ const typeDefsExtend = gql`
 
 const bookResolvers = {
   Query: {
-    book: () => books.find(book => (book.id === 1))
+    book: (id = 1) => {
+      const books = [{ id: 1, title: 'One Book' }];
+
+      return books.find(book => book.id === id);
+    }
   }
-}
+};
 
 const authorResolvers = {
   Query: {
-    author: () => authors.find(author => (author.id === 1))
+    author: (id = 1) => {
+      const authors = [{ id: 1, name: 'One Author', books: [1] }];
+
+      return authors.find(author => author.id === id);
+    }
+  },
+  Author: {
+    bookIds: author => {
+      return author.books;
+    }
   }
-}
+};
 
 const extendResolvers = {
   Book: {
-    author: (book) => {
-      console.log('resolving book.author for', book)
-      return authors.find(author => author.books.includes(book.id))
-    } 
+    author: {
+      fragment: '... on Book { id }',
+      resolve: (book, args, context, info) => {
+        const { id } = book;
+
+        console.log('resolving book.author for', book);
+
+        return info.mergeInfo.delegateToSchema({
+          schema: authorSchema,
+          operation: 'query',
+          fieldName: 'author',
+          args: { id },
+          context,
+          info
+        });
+      }
+    }
   },
   Author: {
-    books: (author) => {
-      console.log('resolving author.books for', author)
-      return books.filter(book => author.books.includes(book.id))
-    } 
+    books: {
+      fragment: '... on Author { bookIds }',
+      resolve: (author, args, context, info) => {
+        const { bookIds } = author;
+
+        console.log('resolving author.books for', author);
+
+        return Promise.all(
+          bookIds.map(id => {
+            return info.mergeInfo.delegateToSchema({
+              schema: bookSchema,
+              operation: 'query',
+              fieldName: 'book',
+              args: { id },
+              context,
+              info
+            });
+          })
+        );
+      }
+    }
   }
-}
+};
 
 const bookSchema = makeExecutableSchema({
   typeDefs: typeDefs1,
@@ -81,10 +122,9 @@ const merged = mergeSchemas({
 });
 
 const server = new ApolloServer({
-  schema: merged,
-})
+  schema: merged
+});
 
-server.applyMiddleware({ app, path: '/api/graphql' })
+server.applyMiddleware({ app, path: '/api/graphql' });
 
-app.listen(8484)
-
+app.listen(8484);
